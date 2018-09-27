@@ -1,0 +1,33 @@
+#!/bin/bash
+# Filter the commits with author info(which is a regexp pattern)
+author=$1
+if [ "$author" == "" ]; then
+	echo "Usage: my-loc.sh {author}, where author is the regex pattern for author's name or email"
+	exit 1
+fi
+
+commits=(`git log --author=$author | grep -v -i 'merge.*into' | grep '^commit\ [0-9a-f]\{40\}' | awk '{print $2}'`)
+
+loc=0
+for commit in "${commits[@]}"
+do
+	mergeMatch=$(git show --stat $commit | grep -i 'merge.*branch')
+	if [ "$mergeMatch" == "" ]; then
+		nInsert=$(git show --stat $commit | grep insertion | awk '{split($0, a, "insertion"); print a[1]}' | awk 'NF{ print $NF }')
+		nDelete=$(git show --stat $commit | grep deletion | awk '{split($0, a, "deletion"); print a[1]}' | awk 'NF{ print $NF }')
+
+		if [ "$nInsert" == "" ]; then
+			nInsert=0
+		fi
+		if [ "$nDelete" == "" ]; then
+			nDelete=0
+		fi
+
+		loc=$((loc+nInsert-nDelete))
+		echo $commit +$nInsert -$nDelete $loc
+	else
+		echo $commit "skip branch merge commit:" $mergeMatch
+	fi
+done
+
+echo $loc lines of code, thanks for the great job, $author!
